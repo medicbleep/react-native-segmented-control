@@ -17,6 +17,15 @@ import Animated, {
 } from 'react-native-reanimated';
 import { widthPercentageToDP } from 'react-native-responsive-screen';
 
+export interface TileProps {
+  /** Styles of the default tile */
+  style: ViewStyle;
+  /** The React Native Reanimated transform style with translateX */
+  transform: ViewStyle['transform'];
+  /** The full width of tile */
+  width: number;
+}
+
 export interface Segment {
   label: string;
   accessibilityLabel?: string;
@@ -84,6 +93,10 @@ export interface SegmentedControlProps {
    * Badge Text Styles
    */
   badgeTextStyle?: TextStyle;
+  /**
+   * Render a custom tile component
+   */
+  renderTile?: (props: TileProps) => React.ReactNode;
 }
 
 const defaultShadowStyle = {
@@ -122,6 +135,7 @@ const SegmentedControl: React.FC<SegmentedControlProps> = ({
   activeBadgeStyle,
   inactiveBadgeStyle,
   badgeTextStyle,
+  renderTile,
 }: SegmentedControlProps) => {
   const width = widthPercentageToDP('100%') - containerMargin * 2;
   const translateValue = width / segments.length;
@@ -197,22 +211,40 @@ const SegmentedControl: React.FC<SegmentedControlProps> = ({
     ...badgeTextStyle,
   };
 
+  const flattenedTileStyle: ViewStyle = StyleSheet.flatten<ViewStyle>([
+    styles.movingSegmentStyle,
+    defaultShadowStyle,
+    StyleSheet.absoluteFill,
+    {
+      width: width / segments.length - 4,
+    },
+    tileStyle,
+  ]);
+
+  const memoizedTile = React.useMemo<React.ReactNode>(() => {
+    if (renderTile) {
+      return renderTile({
+        style: flattenedTileStyle,
+        transform: tabTranslateAnimatedStyles.transform,
+        width: translateValue,
+      });
+    }
+
+    return (
+      <Animated.View style={[flattenedTileStyle, tabTranslateAnimatedStyles]} />
+    );
+  }, [
+    flattenedTileStyle,
+    renderTile,
+    tabTranslateAnimatedStyles,
+    translateValue,
+  ]);
+
   return (
     <Animated.View
       style={[styles.defaultSegmentedControlWrapper, segmentedControlWrapper]}
     >
-      <Animated.View
-        style={[
-          styles.movingSegmentStyle,
-          defaultShadowStyle,
-          tileStyle,
-          StyleSheet.absoluteFill,
-          {
-            width: width / segments.length - 4,
-          },
-          tabTranslateAnimatedStyles,
-        ]}
-      />
+      {memoizedTile}
       {memoizedSegments.map((segment, index) => {
         const isSelected = currentIndex === index;
         const { label, ...accessibilityProps } = segment;
