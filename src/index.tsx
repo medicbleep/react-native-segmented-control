@@ -1,5 +1,8 @@
 import React, { useEffect } from 'react';
 import {
+  AccessibilityRole,
+  AccessibilityState,
+  AccessibilityValue,
   Pressable,
   StyleSheet,
   Text,
@@ -23,11 +26,20 @@ export interface TileProps {
   width: number;
 }
 
-interface SegmentedControlProps {
+export interface Segment {
+  label: string;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  accessibilityRole?: AccessibilityRole;
+  accessibilityState?: AccessibilityState;
+  accessibilityValue?: AccessibilityValue;
+}
+
+export interface SegmentedControlProps {
   /**
-   * The Segments Text Array
+   * An array of Segments. Can be a mix of strings for the Segment labels, or an object with a `label` and accessibility props.
    */
-  segments: Array<string>;
+  segments: Array<string | Segment>;
   /**
    * The Current Active Segment Index
    */
@@ -129,6 +141,14 @@ const SegmentedControl: React.FC<SegmentedControlProps> = ({
   const translateValue = width / segments.length;
   const tabTranslateValue = useSharedValue(0);
 
+  // Transform and memoize all segments into a `Segment` array.
+  // This allows for the segments to be transformed only when they change, and to be treated as `Segment` on render.
+  const memoizedSegments = React.useMemo<Segment[]>(() => {
+    return segments.map((segment) =>
+      typeof segment === 'string' ? { label: segment } : segment
+    );
+  }, [segments]);
+
   // useCallBack with an empty array as input, which will call inner lambda only once and memoize the reference for future calls
   const memoizedTabPressCallback = React.useCallback(
     (index) => {
@@ -225,12 +245,22 @@ const SegmentedControl: React.FC<SegmentedControlProps> = ({
       style={[styles.defaultSegmentedControlWrapper, segmentedControlWrapper]}
     >
       {memoizedTile}
-      {segments.map((segment, index) => {
+      {memoizedSegments.map((segment, index) => {
+        const isSelected = currentIndex === index;
+        const { label, ...accessibilityProps } = segment;
+
         return (
           <Pressable
             onPress={() => memoizedTabPressCallback(index)}
             key={index}
             style={[styles.touchableContainer, pressableWrapper]}
+            accessibilityState={{ selected: isSelected }}
+            accessibilityHint={!isSelected ? `Selects ${label} option` : ''}
+            accessibilityLabel={`${label}, option, ${index + 1} of ${
+              segments.length
+            }`}
+            accessibilityRole="button"
+            {...accessibilityProps}
           >
             <View style={styles.textWrapper}>
               <Text
@@ -240,9 +270,9 @@ const SegmentedControl: React.FC<SegmentedControlProps> = ({
                     : finalisedInActiveTextStyle,
                 ]}
               >
-                {segment}
+                {label}
               </Text>
-              {badgeValues[index] && (
+              {typeof badgeValues[index] === 'number' && (
                 <View
                   style={[
                     styles.defaultBadgeContainerStyle,
